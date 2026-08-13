@@ -1,0 +1,19 @@
+{
+  "domain": "spatial_matter",
+  "name": "Spatial Hub: Matter",
+  "after_dependencies": [
+    "matter"
+  ],
+  "codeowners": [
+    "@chance-konstruktion"
+  ],
+  "config_flow": true,
+  "dependencies": [],
+  "documentation": "https://github.com/Chance-Konstruktion/ha-spatial-matter",
+  "integration_type": "service",
+  "iot_class": "local_polling",
+  "issue_tracker": "https://github.com/Chance-Konstruktion/ha-spatial-matter/issues",
+  "requirements": [],
+  "single_config_entry": true,
+  "version": "260808"
+}
