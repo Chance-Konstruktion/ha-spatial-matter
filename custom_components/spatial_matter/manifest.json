@@ -1,6 +1,6 @@
 {
   "domain": "spatial_matter",
-  "name": "Spatial Hub: Matter",
+  "name": "spatial-hub: matter",
   "after_dependencies": [
     "matter"
   ],
