@@ -99,6 +99,53 @@ class TestKonformitaetMitInhalt(SpatialHubConformance):
         return self._hass.data["spatial_hub_providers"][EIGENE_DOMAIN]
 
 
+def test_entity_registry_is_indexed_once_per_model_refresh(
+    hass: HomeAssistant, enable_custom_integrations, monkeypatch
+) -> None:
+    """Registry work should scale with entity count, not devices × entities."""
+    from custom_components.spatial_matter.spatial import async_setup_spatial
+
+    matter_eintrag = MockConfigEntry(domain=MATTER, title="Matter")
+    matter_eintrag.add_to_hass(hass)
+    geraete = dr.async_get(hass)
+    entitaeten = er.async_get(hass)
+
+    bruecke = geraete.async_get_or_create(
+        config_entry_id=matter_eintrag.entry_id,
+        identifiers={(MATTER, "performance-bridge")},
+        name="Bridge",
+    )
+    for nummer in range(10):
+        kind = geraete.async_get_or_create(
+            config_entry_id=matter_eintrag.entry_id,
+            identifiers={(MATTER, f"performance-device-{nummer}")},
+            name=f"Device {nummer}",
+            via_device=(MATTER, "performance-bridge"),
+        )
+        entitaeten.async_get_or_create(
+            "light", MATTER, f"performance-{nummer}",
+            device_id=kind.id, suggested_object_id=f"performance_{nummer}",
+        )
+
+    eigener = MockConfigEntry(domain=EIGENE_DOMAIN, title="Spatial Matter")
+    eigener.add_to_hass(hass)
+    async_setup_spatial(hass, eigener)
+
+    original_get = er.async_get
+    calls = 0
+
+    def counted_get(instance):
+        nonlocal calls
+        calls += 1
+        return original_get(instance)
+
+    monkeypatch.setattr(er, "async_get", counted_get)
+    payload = hass.data["spatial_hub_providers"][EIGENE_DOMAIN]["data"]()
+
+    assert len(payload["nodes"]) == 11
+    assert calls == 1, "the entity registry must be indexed once per refresh"
+
+
 def test_die_nutzlast_ist_wirklich_nicht_leer(
     hass: HomeAssistant, enable_custom_integrations
 ) -> None:
