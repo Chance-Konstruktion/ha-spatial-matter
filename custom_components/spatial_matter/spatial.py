@@ -66,8 +66,8 @@ def _devices(hass: HomeAssistant) -> dict[str, Any]:
     return devices
 
 
-def _entities_of(hass: HomeAssistant, device_id: str) -> list[Any]:
-    """The node's own entities -- the ones Matter itself reports.
+def _entities_by_device(hass: HomeAssistant) -> dict[str, list[Any]]:
+    """Index Matter entities once, rather than scanning the full registry per node.
 
     A device is not one integration's property. A lamp reached over Matter
     *and* over its vendor's own cloud integration carries entities from
@@ -77,14 +77,22 @@ def _entities_of(hass: HomeAssistant, device_id: str) -> list[Any]:
     try:
         registry = er.async_get(hass)
     except (AttributeError, KeyError):  # pragma: no cover
-        return []
-    return [
-        entry
-        for entry in getattr(registry, "entities", {}).values()
-        if getattr(entry, "device_id", None) == device_id
-        and getattr(entry, "platform", MATTER_DOMAIN) == MATTER_DOMAIN
-        and not getattr(entry, "disabled_by", None)
-    ]
+        return {}
+    by_device: dict[str, list[Any]] = {}
+    for entry in getattr(registry, "entities", {}).values():
+        device_id = getattr(entry, "device_id", None)
+        if (
+            device_id
+            and getattr(entry, "platform", MATTER_DOMAIN) == MATTER_DOMAIN
+            and not getattr(entry, "disabled_by", None)
+        ):
+            by_device.setdefault(device_id, []).append(entry)
+    return by_device
+
+
+def _entities_of(hass: HomeAssistant, device_id: str) -> list[Any]:
+    """Compatibility helper for callers that only need one device."""
+    return _entities_by_device(hass).get(device_id, [])
 
 
 def _representative(entries: list[Any]) -> str | None:
@@ -137,6 +145,7 @@ def async_setup_spatial(hass: HomeAssistant, entry: Any) -> None:
         # Who hangs behind whom. Only counted within Matter: a Matter device
         # can sit behind something this layer does not draw, and an edge to
         # a node that is not there is a line to nowhere.
+        entities_by_device = _entities_by_device(hass)
         children: dict[str, list[str]] = {}
         for device in devices.values():
             parent = getattr(device, "via_device_id", None)
@@ -146,7 +155,7 @@ def async_setup_spatial(hass: HomeAssistant, entry: Any) -> None:
         nodes = []
         edges = []
         for device in sorted(devices.values(), key=lambda device: device.id):
-            entries = _entities_of(hass, device.id)
+            entries = entities_by_device.get(device.id, [])
             state = _reachable(hass, entries)
             bridged = children.get(device.id, [])
             is_bridge = bool(bridged)
