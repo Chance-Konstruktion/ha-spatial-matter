@@ -105,7 +105,10 @@ def netz():
         if war_zu:
             if hosts:
                 hosts(["127.0.0.1"], allow_unix_socket=True)
-            pytest_socket.disable_socket()
+            # Genau den Zustand des HA-Test-Plugins wiederherstellen:
+            # asyncio braucht die Unix-Socket-Selbstroehre, sonst stirbt
+            # jedes hass-Fixture alphabetisch nach diesem Test.
+            pytest_socket.disable_socket(allow_unix_socket=True)
 
 
 def _quelle(name: str) -> str:
